@@ -3,10 +3,8 @@
 #include "Graph.hpp"
 
 Graph GenerateRicobit(int K) {
-    // K: number of concentric rings (≥1)
     if (K < 1) return Graph(0);
 
-    // 1) compute ring sizes 2^L and start indices
     std::vector<int> ringSize(K + 1), start(K + 1);
     for (int L = 1; L <= K; ++L)
         ringSize[L] = 1 << L;
@@ -16,9 +14,7 @@ Graph GenerateRicobit(int K) {
 
     int N = start[K] + ringSize[K];
     Graph g(N);
-    // all nodes are compute by default
 
-    // 2) intra-ring edges (each ring is a cycle)
     for (int L = 1; L <= K; ++L) {
         int sz = ringSize[L], base = start[L];
         for (int i = 0; i < sz; ++i) {
@@ -30,8 +26,6 @@ Graph GenerateRicobit(int K) {
         }
     }
 
-    // 3) inter-ring “radial” edges
-    //    node n in ring L connects to 2n,2n+1 in ring L+1
     for (int L = 1; L < K; ++L) {
         int base = start[L], nextBase = start[L + 1];
         int sz = ringSize[L];
@@ -49,16 +43,13 @@ Graph GenerateRicobit(int K) {
 
 
 inline Graph GenerateTreeMesh(int mesh_k) {
-    // mesh_k must be a power of two (≥2)
     if (mesh_k < 2 || (mesh_k & (mesh_k - 1)) != 0) return Graph(0);
 
-    // 1) tree depth = log2(mesh_k)
     int levels = 0;
     while ((1 << levels) < mesh_k) ++levels;
 
     int meshN = mesh_k * mesh_k;
 
-    // 2) count internal tree nodes: sum_{t=0..levels-1} 4^t
     std::vector<int> treeStart(levels);
     int internalN = 0;
     for (int t = 0; t < levels; ++t) {
@@ -68,7 +59,6 @@ inline Graph GenerateTreeMesh(int mesh_k) {
     int N = meshN + internalN;
     Graph g(N);
 
-    // 3) mesh edges among level-0 nodes
     for (int r = 0; r < mesh_k; ++r) {
         for (int c = 0; c < mesh_k; ++c) {
             int u = r * mesh_k + c;
@@ -77,7 +67,6 @@ inline Graph GenerateTreeMesh(int mesh_k) {
         }
     }
 
-    // 4) tree edges
     for (int t = 0; t < levels; ++t) {
         int blocks = 1 << t;
         int childBlocks = blocks << 1;
@@ -86,7 +75,6 @@ inline Graph GenerateTreeMesh(int mesh_k) {
             for (int cc = 0; cc < blocks; ++cc) {
                 int parent = base + rr * blocks + cc;
                 if (t + 1 == levels) {
-                    // children are mesh leaves
                     int size = mesh_k >> t;
                     int r0 = rr * size, c0 = cc * size;
                     for (int dr = 0; dr < 2; ++dr) {
@@ -108,7 +96,6 @@ inline Graph GenerateTreeMesh(int mesh_k) {
         }
     }
 
-    // 5) mark compute only on mesh nodes (level 0)
     std::vector<bool> compute(N, false);
     for (int i = 0; i < meshN; ++i)
         compute[i] = true;
@@ -119,7 +106,6 @@ inline Graph GenerateTreeMesh(int mesh_k) {
 
 
 Graph GenerateMeshOfTrees(int mesh_k) {
-    // mesh_k: side length of mesh, must be power of two ≥2
     if (mesh_k < 2 || (mesh_k & (mesh_k - 1)) != 0) return Graph(0);
 
     int h = 0;
@@ -135,7 +121,6 @@ Graph GenerateMeshOfTrees(int mesh_k) {
     int baseCol = leafCount + mesh_k * internalPerTree;
     int maxHeap = 2 * mesh_k - 1;
 
-    // row trees
     for (int r = 0; r < mesh_k; ++r) {
         int offset = baseRow + r * internalPerTree;
         for (int i = 1; i <= internalPerTree; ++i) {
@@ -156,7 +141,6 @@ Graph GenerateMeshOfTrees(int mesh_k) {
         }
     }
 
-    // column trees
     for (int c = 0; c < mesh_k; ++c) {
         int offset = baseCol + c * internalPerTree;
         for (int i = 1; i <= internalPerTree; ++i) {
@@ -177,7 +161,6 @@ Graph GenerateMeshOfTrees(int mesh_k) {
         }
     }
 
-    // mark compute only on mesh leaves
     std::vector<bool> compute(N, false);
     for (int i = 0; i < leafCount; ++i)
         compute[i] = true;
@@ -187,77 +170,70 @@ Graph GenerateMeshOfTrees(int mesh_k) {
 }
 
 inline Graph GenerateFatHTree(int n) {
-    // n: log2 of grid side length (≥1)
     if (n < 1) return Graph(0);
 
     int Nside = 1 << n;
     int coreCount = Nside * Nside;
 
-    // 1) compute counts and start indices for red ranks 0..n
-    std::vector<int> count(n+1), start_red(n+1);
+    std::vector<int> count(n + 1), start_red(n + 1);
     for (int lvl = 0; lvl <= n; ++lvl) {
         int dim = Nside >> lvl;
         count[lvl] = dim * dim;
-        start_red[lvl] = (lvl == 0 ? 0 : start_red[lvl-1] + count[lvl-1]);
+        start_red[lvl] = (lvl == 0 ? 0 : start_red[lvl - 1] + count[lvl - 1]);
     }
-    // 2) compute start indices for black ranks 1..n
-    std::vector<int> start_black(n+1);
+    std::vector<int> start_black(n + 1);
     start_black[1] = start_red[n] + count[n];
     for (int lvl = 2; lvl <= n; ++lvl) {
-        start_black[lvl] = start_black[lvl-1] + count[lvl-1];
+        start_black[lvl] = start_black[lvl - 1] + count[lvl - 1];
     }
     int N = start_black[n] + count[n];
     Graph g(N);
 
-    // 3) mark only rank-0 (cores) as compute nodes
     std::vector<bool> compute(N, false);
     for (int i = 0; i < coreCount; ++i) compute[i] = true;
     g.SetCompute(compute);
 
-    // 4) red tree: for each rank lvl = 0..n-1, connect to lvl+1
     for (int lvl = 0; lvl < n; ++lvl) {
-        int dim    = Nside >> lvl;
-        int nextDim= Nside >> (lvl+1);
-        int base   = start_red[lvl];
-        int baseP  = start_red[lvl+1];
+        int dim = Nside >> lvl;
+        int nextDim = Nside >> (lvl + 1);
+        int base = start_red[lvl];
+        int baseP = start_red[lvl + 1];
         for (int y = 0; y < dim; ++y) {
             for (int x = 0; x < dim; ++x) {
-                int u = base + y*dim + x;
+                int u = base + y * dim + x;
                 int vx = x >> 1, vy = y >> 1;
-                int v = baseP + vy*nextDim + vx;
+                int v = baseP + vy * nextDim + vx;
                 if (u < v) g.AddEdge(u, v);
-                else       g.AddEdge(v, u);
+                else g.AddEdge(v, u);
             }
         }
     }
 
-    // 5) black tree: level 0→1 from cores
     for (int y = 0; y < Nside; ++y) {
         for (int x = 0; x < Nside; ++x) {
             int X0 = (x + Nside - 1) & (Nside - 1);
             int Y0 = (y + Nside - 1) & (Nside - 1);
-            int u  = y * Nside + x;
+            int u = y * Nside + x;
             int base1 = start_black[1];
-            int dim1  = Nside >> 1;
+            int dim1 = Nside >> 1;
             int vx = X0 >> 1, vy = Y0 >> 1;
-            int v  = base1 + vy*dim1 + vx;
+            int v = base1 + vy * dim1 + vx;
             if (u < v) g.AddEdge(u, v);
-            else       g.AddEdge(v, u);
+            else g.AddEdge(v, u);
         }
     }
-    // black tree: levels 1..n-1
     for (int lvl = 1; lvl < n; ++lvl) {
-        int dim     = Nside >> lvl;
-        int nextDim = Nside >> (lvl+1);
-        int base    = start_black[lvl];
-        int baseP   = start_black[lvl+1];
+        int dim = Nside >> lvl;
+        int nextDim = Nside >> (lvl + 1);
+        int base = start_black[lvl];
+        int baseP = start_black[lvl + 1];
         for (int y = 0; y < dim; ++y) {
             for (int x = 0; x < dim; ++x) {
-                int u = base + y*dim + x;
+                int u = base + y * dim + x;
                 int vx = x >> 1, vy = y >> 1;
-                int v = baseP + vy*nextDim + vx;
+                int v = baseP + vy * nextDim + vx;
                 if (u < v) g.AddEdge(u, v);
-                else       g.AddEdge(v, u);
+                else g.AddEdge(v, u);
             }
         }
     }
@@ -266,27 +242,24 @@ inline Graph GenerateFatHTree(int n) {
 }
 
 Graph GenerateMeshOfStars(int leavesPerHub, int meshSide) {
-    int numHubs    = meshSide * meshSide;
+    int numHubs = meshSide * meshSide;
     int numCompute = numHubs * leavesPerHub;
     Graph g(numCompute + numHubs);
 
-    // 1) помечаем первые numCompute вершин как вычислительные
     std::vector<bool> compute(numCompute + numHubs, false);
     for (int id = 0; id < numCompute; ++id) {
         compute[id] = true;
     }
     g.SetCompute(compute);
 
-    // 2) подключаем вычислительные узлы (leaves) к своим концентраторам (hubs)
     for (int h = 0; h < numHubs; ++h) {
-        int hubId    = numCompute + h;
+        int hubId = numCompute + h;
         int baseLeaf = h * leavesPerHub;
         for (int k = 0; k < leavesPerHub; ++k) {
             g.AddEdge(hubId, baseLeaf + k);
         }
     }
 
-    // 3) строим mesh-связи между концентраторами
     auto hubIndex = [&](int i, int j) {
         return numCompute + (i * meshSide + j);
     };
@@ -313,18 +286,14 @@ Graph GenerateMeshOfSpidergon(int n, int meshSide) {
     int N = clusterSize * numClusters;
     Graph g(N);
 
-    // 1) Внутрикластерная топология Spidergon:
-    //    – кольцо из 4n вершин
-    //    – диагональные «противоположные» связи k<->k+2n
     for (int c = 0; c < numClusters; ++c) {
         int base = c * clusterSize;
-        // кольцо
+
         for (int k = 0; k < clusterSize; ++k) {
             int u = base + k;
             int v = base + ((k + 1) % clusterSize);
             g.AddEdge(u, v);
         }
-        // противоположные связи
         for (int k = 0; k < 2 * n; ++k) {
             int u = base + k;
             int v = base + (k + 2 * n);
@@ -332,9 +301,6 @@ Graph GenerateMeshOfSpidergon(int n, int meshSide) {
         }
     }
 
-    // 2) Межкластерные mesh-связи через специальные узлы:
-    //    – «вправо»: узел n  к узлу 3n у соседа справа
-    //    – «вниз»:   узел 2n к узлу 0  у соседа внизу
     auto clusterBase = [&](int i, int j) {
         return (i * meshSide + j) * clusterSize;
     };
@@ -343,7 +309,7 @@ Graph GenerateMeshOfSpidergon(int n, int meshSide) {
             int base = clusterBase(i, j);
             if (j + 1 < meshSide) {
                 int rightBase = clusterBase(i, j + 1);
-                g.AddEdge(base +     n, rightBase + 3 * n);
+                g.AddEdge(base + n, rightBase + 3 * n);
             }
             if (i + 1 < meshSide) {
                 int downBase = clusterBase(i + 1, j);

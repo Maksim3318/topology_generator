@@ -7,7 +7,7 @@
 #include <queue>
 #include <iostream>
 
-// Compute cut size (# edges crossing partition)
+
 static int CutSize(const Graph &g, const std::vector<int> &part) {
     int n = g.NumVertices(), cut = 0;
     for (int u = 0; u < n; ++u) {
@@ -20,7 +20,7 @@ static int CutSize(const Graph &g, const std::vector<int> &part) {
     return cut;
 }
 
-// Heavy-edge matching for coarsening
+
 static std::vector<int> HeavyEdgeMatching(const Graph &g) {
     int n = g.NumVertices();
     std::vector<int> mate(n, -1), order(n);
@@ -46,7 +46,7 @@ static std::vector<int> HeavyEdgeMatching(const Graph &g) {
     return mate;
 }
 
-// Build coarse graph by contracting matched pairs
+
 static std::pair<Graph, std::vector<std::vector<int>>> BuildCoarse(
         const Graph &g,
         const std::vector<int> &mate) {
@@ -84,7 +84,7 @@ static std::pair<Graph, std::vector<std::vector<int>>> BuildCoarse(
     return {std::move(cg), std::move(cmap)};
 }
 
-// Naive Kernighan-Lin refinement (FM pass)
+
 static void RefineNaive(
         const Graph &g,
         std::vector<int> &part,
@@ -125,7 +125,7 @@ static void RefineNaive(
     }
 }
 
-// Spectral initialization (power iteration)
+
 static std::vector<double> SpectralVector(const Graph &g, int iters) {
     int n = g.NumVertices();
     std::vector<double> x(n), y(n);
@@ -151,7 +151,6 @@ static std::vector<double> SpectralVector(const Graph &g, int iters) {
 }
 
 
-// Simulated Annealing for final refinement
 static void SimulatedAnnealing(
         const Graph &g,
         std::vector<int> &part,
@@ -168,7 +167,7 @@ static void SimulatedAnnealing(
         if ((to == 1 && count1 + 1 > (n + 1) / 2) || (to == 0 && count0 + 1 > n / 2)) continue;
         int same = 0, diff = 0;
         for (int v: g.Neighbors(u)) (part[v] == from ? ++same : ++diff);
-        int delta = diff - same;  // maximize gain for min-cut is diff-same <0, but we keep this
+        int delta = diff - same;
         if (delta > 0 || ud(rng) < std::exp(-delta / T)) {
             part[u] = to;
             if (to == 1) {
@@ -183,12 +182,12 @@ static void SimulatedAnnealing(
     }
 }
 
-// Multilevel bisection (min-cut only)
+
 static std::vector<int> MultilevelBisection(
         const Graph &g_input, const Config &cfg) {
     Graph g = g_input;
     std::vector<std::pair<std::vector<std::vector<int>>, Graph>> stk;
-    // Coarsen
+
     while (g.NumVertices() > cfg.limit) {
         auto mate = HeavyEdgeMatching(g);
         auto coarse = BuildCoarse(g, mate);
@@ -196,10 +195,10 @@ static std::vector<int> MultilevelBisection(
         g = std::move(coarse.first);
     }
     int cn = g.NumVertices();
-    // Spectral + random candidates
+
     std::vector<std::pair<int, std::vector<int>>> cand;
     cand.reserve(cfg.spectral_runs + cfg.random_restarts);
-    // spectral starts
+
     for (int sr = 0; sr < cfg.spectral_runs; ++sr) {
         auto vec = SpectralVector(g, cfg.spectral_iters);
         std::vector<int> idx(cn);
@@ -210,7 +209,7 @@ static std::vector<int> MultilevelBisection(
         RefineNaive(g, part, cfg.fm_passes);
         cand.emplace_back(CutSize(g, part), part);
     }
-    // random restarts
+
     {
         std::mt19937 rng(std::random_device{}());
         for (int rr = 0; rr < cfg.random_restarts; ++rr) {
@@ -223,7 +222,7 @@ static std::vector<int> MultilevelBisection(
             cand.emplace_back(CutSize(g, part), part);
         }
     }
-    // pick best
+
     std::sort(cand.begin(), cand.end(), [](auto &a, auto &b) { return a.first < b.first; });
     int topk = std::min(cfg.spectral_topk, static_cast<int>(cand.size()));
     int bestc = std::numeric_limits<int>::max();
@@ -235,7 +234,7 @@ static std::vector<int> MultilevelBisection(
             bestp = cand[i].second;
         }
     }
-    // uncoarsen + refine + SA
+
     std::vector<int> part = bestp;
     while (!stk.empty()) {
         auto pr = std::move(stk.back());
@@ -256,7 +255,7 @@ static std::vector<int> MultilevelBisection(
 
 Metrics ComputeMetrics(const Graph &g, const Config &cfg) {
     int n = g.NumVertices();
-    // Degrees
+
     std::vector<int> degree(n);
     for (int u = 0; u < n; ++u) {
         degree[u] = static_cast<int>(g.Neighbors(u).size());
@@ -264,22 +263,21 @@ Metrics ComputeMetrics(const Graph &g, const Config &cfg) {
     int min_deg = *std::min_element(degree.begin(), degree.end());
     int max_deg = *std::max_element(degree.begin(), degree.end());
 
-    // Packing density: N_total/N_compute * sum(eccentricity[u] * degree[u])
-    // accumulate pack_sum over ALL vertices, not just compute-nodes
+
     double pack_sum = 0.0;
     auto compute_nodes = g.ComputeNodes();
     int n_compute = static_cast<int>(std::count(compute_nodes.begin(), compute_nodes.end(), true));
 
-    // For path metrics
+
     long long total_dist = 0;
     long long total_pairs = 0;
     double total_paths = 0;
 
     int global_diameter = 0;
 
-    // For each source, run BFS to get distances and path counts
+
     for (int src = 0; src < n; ++src) {
-        // BFS
+
         std::vector<int> dist(n, std::numeric_limits<int>::max());
         std::vector<uint64_t> path_count(n, 0);
         std::queue<int> q;
@@ -294,38 +292,36 @@ Metrics ComputeMetrics(const Graph &g, const Config &cfg) {
             int du = dist[u];
             for (int v: g.Neighbors(u)) {
                 if (dist[v] == std::numeric_limits<int>::max()) {
-                    // first visit
+
                     dist[v] = du + 1;
                     path_count[v] = path_count[u];
                     q.push(v);
                 } else if (dist[v] == du + 1) {
-                    // another shortest path
+
                     path_count[v] += path_count[u];
                 }
             }
         }
 
-        // Eccentricity = max finite dist
+
         int ecc = 0;
         for (int v = 0; v < n; ++v) {
             if (dist[v] < std::numeric_limits<int>::max()) {
                 ecc = std::max(ecc, dist[v]);
-            }
-            else
-            {
+            } else {
                 std::cerr << "Graph is unconnected\n";
                 exit(1);
             }
         }
         global_diameter = std::max(global_diameter, ecc);
 
-        // accumulate cost for all nodes
+
         if (degree[src] == 1 && compute_nodes[src] && !compute_nodes[g.Neighbors(src)[0]])
             pack_sum += static_cast<double>(ecc) * degree[g.Neighbors(src)[0]];
         else
             pack_sum += static_cast<double>(ecc) * degree[src];
 
-        // Accumulate distances and path counts for pairs (src, v)
+
         for (int v = 0; v < n; ++v) {
             if (v == src) continue;
             if (dist[v] < std::numeric_limits<int>::max()) {
@@ -340,23 +336,23 @@ Metrics ComputeMetrics(const Graph &g, const Config &cfg) {
     m.nodes_count = n;
     m.compute_nodes_count = n_compute;
     m.diameter = global_diameter;
-    // average over ordered pairs: divide by total_pairs
+
     m.average_path_length = total_pairs > 0
                             ? static_cast<double>(total_dist) / total_pairs
                             : 0.0;
     m.min_degree = min_deg;
     m.max_degree = max_deg;
 
-    // global packing density
+
     m.global_packing_density = static_cast<double>(m.nodes_count) / (global_diameter * max_deg);
-    // Packing density normalized by sum of (ecc * degree)
+
     if (n_compute > 0 && pack_sum != 0.0) {
-        // Packing density based on Moore bound: (D_min * Delta) / sum_ecc_deg
+
         int Delta = max_deg;
         int D_min = 1;
         if (Delta > 1) {
-            unsigned long long moore = 1ULL;   // 1 + Δ * Σ(Δ-1)^i
-            unsigned long long power = 1ULL;   // (Δ-1)^0
+            unsigned long long moore = 1ULL;
+            unsigned long long power = 1ULL;
             for (D_min = 1;; ++D_min) {
                 if (D_min == 1) {
                     moore = 1ULL + static_cast<unsigned long long>(Delta) * power;
@@ -368,7 +364,7 @@ Metrics ComputeMetrics(const Graph &g, const Config &cfg) {
             }
         }
         if (pack_sum > 0.0) {
-            // normalization includes compute node fraction
+
             m.norm_local_packing_density =
                     (static_cast<double>(D_min) * Delta / pack_sum) * (static_cast<double>(n_compute));
         } else {
@@ -382,7 +378,8 @@ Metrics ComputeMetrics(const Graph &g, const Config &cfg) {
                                    : 0.0;
 
     m.norm_average_num_shortest_paths = total_pairs > 0
-                                        ? static_cast<double>(total_paths) / (static_cast<double>(total_pairs) * global_diameter)
+                                        ? static_cast<double>(total_paths) /
+                                          (static_cast<double>(total_pairs) * global_diameter)
                                         : 0.0;
 
     auto part = MultilevelBisection(g, cfg);

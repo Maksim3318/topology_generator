@@ -7,7 +7,7 @@
 #include "Graph.hpp"
 
 Graph GenerateHoneycombMesh(int t) {
-    // t: honeycomb size
+
     std::vector<std::tuple<int, int, int>> coords;
     coords.reserve(6 * t * t);
     for (int x = -t + 1; x <= t; ++x)
@@ -51,7 +51,7 @@ Graph GenerateHoneycombMesh(int t) {
 }
 
 Graph GenerateHoneycombTorus(int t) {
-    // t: honeycomb size
+
     std::vector<std::tuple<int, int, int>> coords;
     coords.reserve(6 * t * t);
     for (int x = -t + 1; x <= t; ++x)
@@ -105,10 +105,9 @@ Graph GenerateHoneycombTorus(int t) {
     return g;
 }
 
-// rows, cols : lattice dimensions (≥1)
-// d           : 1 (“single-layer HS1”)  or 2 (“double-layer HS2”)
+
 Graph GenerateHexStarMesh(int rows, int cols, int d) {
-    /* ---------- helper lambdas ---------- */
+
     auto cubeDist = [](int x, int y, int z) {
         return (std::abs(x) + std::abs(y) + std::abs(z)) / 2;
     };
@@ -116,8 +115,7 @@ Graph GenerateHexStarMesh(int rows, int cols, int d) {
         return ((long long) x << 40) ^ ((long long) y << 20) ^ (long long) z;
     };
 
-    /* ---------- 1. local star (vertices + edges) ---------- */
-    /* 1.1 HS₁ block (18 nodes around origin, dist = 1 or 2) */
+
     std::vector<std::array<int, 3>> base;
     for (int x = -2; x <= 2; ++x)
         for (int y = -2; y <= 2; ++y) {
@@ -127,7 +125,7 @@ Graph GenerateHexStarMesh(int rows, int cols, int d) {
             if (r == 1 || r == 2) base.push_back({x, y, z});
         }
 
-    /* 1.2 build HS_d by placing this block on a 3×3 cube grid of radius d-1 */
+
     int Rlayer = d - 1;
     std::vector<std::array<int, 3>> local;
     for (int q = -Rlayer; q <= Rlayer; ++q)
@@ -139,9 +137,9 @@ Graph GenerateHexStarMesh(int rows, int cols, int d) {
         }
     std::sort(local.begin(), local.end());
     local.erase(std::unique(local.begin(), local.end()), local.end());
-    int nLocal = static_cast<int>(local.size());           // 18 (d=1)  /  84 (d=2)
+    int nLocal = static_cast<int>(local.size());
 
-    /* 1.3 local adjacency (6 hex + 2 diagonal) */
+
     constexpr int dir[8][3] = {
             {1,  -1, 0},
             {1,  0,  -1},
@@ -166,19 +164,19 @@ Graph GenerateHexStarMesh(int rows, int cols, int d) {
         }
     }
 
-    /* 1.4 indices of the four boundary nodes we’ll stitch through */
-    int Rhex = 3 * d - 1;                          // outer radius
+
+    int Rhex = 3 * d - 1;
     int idxE = l2i[pack(Rhex, -Rhex, 0)];
     int idxW = l2i[pack(-Rhex, Rhex, 0)];
     int idxSE = l2i[pack(0, Rhex, -Rhex)];
     int idxNW = l2i[pack(0, -Rhex, Rhex)];
 
-    /* ---------- 2. grid placement ---------- */
-    int spacing = 2 * Rhex;                    // centres distance so borders touch
-    const int east[3] = {spacing, -spacing, 0};      // (q +1)
-    const int se[3] = {0, spacing, -spacing};     // (r +1)
 
-    /* first pass: produce all coordinates, dedup shared borders */
+    int spacing = 2 * Rhex;
+    const int east[3] = {spacing, -spacing, 0};
+    const int se[3] = {0, spacing, -spacing};
+
+
     std::unordered_map<long long, int> g2i;
     std::vector<std::array<int, 3>> global;
     for (int row = 0; row < rows; ++row) {
@@ -198,7 +196,7 @@ Graph GenerateHexStarMesh(int rows, int cols, int d) {
     }
     Graph g(static_cast<int>(global.size()));
 
-    /* second pass: add local edges for every star */
+
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < cols; ++col) {
             int cx = col * east[0] + row * se[0];
@@ -216,7 +214,7 @@ Graph GenerateHexStarMesh(int rows, int cols, int d) {
         }
     }
 
-    /* third pass: stitching adjacent stars (east & south-east neighbours) */
+
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < cols; ++col) {
             int cx = col * east[0] + row * se[0];
@@ -226,13 +224,13 @@ Graph GenerateHexStarMesh(int rows, int cols, int d) {
             int centerE_x = cx + east[0], centerE_y = cy + east[1], centerE_z = cz + east[2];
             int centerSE_x = cx + se[0], centerSE_y = cy + se[1], centerSE_z = cz + se[2];
 
-            // east neighbour
+
             if (col + 1 < cols) {
                 int vE = g2i[pack(local[idxE][0] + cx, local[idxE][1] + cy, local[idxE][2] + cz)];
                 int uW = g2i[pack(local[idxW][0] + centerE_x, local[idxW][1] + centerE_y, local[idxW][2] + centerE_z)];
                 if (vE < uW) g.AddEdge(vE, uW);
             }
-            // south-east neighbour
+
             if (row + 1 < rows) {
                 int vSE = g2i[pack(local[idxSE][0] + cx, local[idxSE][1] + cy, local[idxSE][2] + cz)];
                 int uNW = g2i[pack(local[idxNW][0] + centerSE_x, local[idxNW][1] + centerSE_y,
@@ -244,35 +242,34 @@ Graph GenerateHexStarMesh(int rows, int cols, int d) {
     return g;
 }
 
-// Generate a 2-dimensional (k-digit, radix-d) undirected De Bruijn graph.
-// d ≥ 2, k ≥ 1, N = dᵏ vertices, degree ≤ 2d
+
 Graph GenerateDeBruijn(int d, int k) {
-    /* ---- sanity ---- */
+
     if (d < 2 || k < 1) return Graph(0);
 
-    /* ---- number of vertices ---- */
+
     int N = 1;
     for (int i = 0; i < k; ++i) {
-        if (N > INT_MAX / d) return Graph(0);   // overflow guard
+        if (N > INT_MAX / d) return Graph(0);
         N *= d;
     }
     Graph g(N);
 
-    const int step = N / d;                    // d^{k-1}
+    const int step = N / d;
 
     for (int v = 0; v < N; ++v) {
-        int v_shiftR = v / d;                  // ⌊v / d⌋
+        int v_shiftR = v / d;
 
-        /* d “left-shift” neighbours: (v·d + r) mod N */
-        int baseL = v * d % N;                 // (v·d) mod N
+
+        int baseL = v * d % N;
         for (int r = 0; r < d; ++r) {
-            int u = baseL + r;                 // +r  (already < N)
-            if (v < u) g.AddEdge(v, u);        // avoid duplicates
+            int u = baseL + r;
+            if (v < u) g.AddEdge(v, u);
         }
 
-        /* d “right-shift” neighbours: ⌊v / d⌋ + r·d^{k-1} */
+
         for (int r = 0; r < d; ++r) {
-            int u = v_shiftR + r * step;       // always < N
+            int u = v_shiftR + r * step;
             if (v < u) g.AddEdge(v, u);
         }
     }
@@ -282,61 +279,54 @@ Graph GenerateDeBruijn(int d, int k) {
 Graph Generate3DDeBruijn(int d, int k, int layers) {
     if (d < 2 || k < 1 || layers < 2) return Graph(0);
 
-    /* ---- size per layer ---- */
+
     long long n_plane = 1;
     for (int i = 0; i < k; ++i) {
         n_plane *= d;
-        if (n_plane > INT_MAX) return Graph(0);         // overflow guard
+        if (n_plane > INT_MAX) return Graph(0);
     }
     int Nplane = static_cast<int>(n_plane);
     int Ntotal = Nplane * layers;
     Graph g(Ntotal);
 
-    const int step = Nplane / d;                        // d^{k-1}
+    const int step = Nplane / d;
 
-    /* ---- horizontal edges (each layer independently) ---- */
     for (int z = 0; z < layers; ++z) {
-        int base = z * Nplane;                          // offset of this layer
+        int base = z * Nplane;
         for (int v = 0; v < Nplane; ++v) {
-            int vR = v / d;                             // right-shift (drop LS digit)
-            int baseL = (v * d) % Nplane;               // left-shift (drop MS digit)
+            int vR = v / d;
+            int baseL = (v * d) % Nplane;
 
-            /* d neighbours by left shift */
             for (int r = 0; r < d; ++r) {
-                int u = baseL + r;                      // already < Nplane
+                int u = baseL + r;
                 if (v < u) g.AddEdge(base + v, base + u);
             }
-            /* d neighbours by right shift */
             for (int r = 0; r < d; ++r) {
-                int u = vR + r * step;                  // always < Nplane
+                int u = vR + r * step;
                 if (v < u) g.AddEdge(base + v, base + u);
             }
         }
     }
 
-    /* ---- vertical edges (enhanced pillar) ----
-       connect routers with same horizontal address on consecutive layers
-       (pillar concept) :contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1}                                      */
     for (int z = 0; z < layers - 1; ++z) {
-        int offsetZ   =  z      * Nplane;
-        int offsetZ1  = (z + 1) * Nplane;
+        int offsetZ = z * Nplane;
+        int offsetZ1 = (z + 1) * Nplane;
         for (int v = 0; v < Nplane; ++v)
-            g.AddEdge(offsetZ + v, offsetZ1 + v);       // one edge per pillar segment
+            g.AddEdge(offsetZ + v, offsetZ1 + v);
     }
     return g;
 }
 
-Graph GenerateDIMB(int d, int k)
-{
+Graph GenerateDIMB(int d, int k) {
     if (d < 2 || k < 1) return Graph(0);
-    // n = d^k
+
     int N1 = 1;
     for (int i = 0; i < k; ++i) {
         N1 *= d;
     }
     int N = N1 * N1;
     Graph g(N);
-    int step = N1 / d;  // d^(k-1)
+    int step = N1 / d;
 
     for (int y = 0; y < N1; ++y) {
         for (int x = 0; x < N1; ++x) {
@@ -344,26 +334,23 @@ Graph GenerateDIMB(int d, int k)
             std::vector<int> nbrs;
             nbrs.reserve(4 * d);
 
-            // row: left‐shift and right‐shift
             int baseL = (x * d) % N1;
-            int xR    = x / d;
+            int xR = x / d;
             for (int r = 0; r < d; ++r) {
                 nbrs.push_back(y * N1 + (baseL + r));
                 nbrs.push_back(y * N1 + (xR + r * step));
             }
 
-            // column: left‐shift and right‐shift
             int baseC = (y * d) % N1;
-            int yR    = y / d;
+            int yR = y / d;
             for (int r = 0; r < d; ++r) {
                 nbrs.push_back((baseC + r) * N1 + x);
                 nbrs.push_back((yR + r * step) * N1 + x);
             }
 
-            // remove duplicates and self‐loops
             std::sort(nbrs.begin(), nbrs.end());
             nbrs.erase(std::unique(nbrs.begin(), nbrs.end()), nbrs.end());
-            for (int u : nbrs) {
+            for (int u: nbrs) {
                 if (u != src) {
                     g.AddEdge(src, u, true);
                 }
@@ -373,9 +360,6 @@ Graph GenerateDIMB(int d, int k)
     return g;
 }
 
-// k – number of diagonals (≥2)
-// m – number of super‐nodes per diagonal (≥2, even or odd)
-// Each super‐node has 4 cores (l=0..3).  Total N = k*m*4.
 Graph GenerateHERT(int k, int m) {
     int N = k * m * 4;
     Graph g(N);
@@ -389,7 +373,7 @@ Graph GenerateHERT(int k, int m) {
             for (int l = 0; l < 4; ++l) {
                 int v = id(i, j, l);
 
-                // 1) local ring in the super‐node of 4 cores
+
                 int l1 = (l + 1) % 4;
                 int l2 = (l + 3) % 4;
                 int u1 = id(i, j, l1);
@@ -397,11 +381,7 @@ Graph GenerateHERT(int k, int m) {
                 if (v < u1) g.AddEdge(v, u1);
                 if (v < u2) g.AddEdge(v, u2);
 
-                // 2) global ring:
-                //    even l → circular links along j in same diagonal i
-                //    odd  l → radial   links along i in same super‐node j
                 if ((l & 1) == 0) {
-                    // circular neighbors: j±1 mod m
                     int jn = (j + 1) % m;
                     int jp = (j - 1 + m) % m;
                     int uc = id(i, jn, l);
@@ -409,7 +389,6 @@ Graph GenerateHERT(int k, int m) {
                     if (v < uc) g.AddEdge(v, uc);
                     if (v < ud) g.AddEdge(v, ud);
                 } else {
-                    // radial neighbors: i±1 mod k
                     int in = (i + 1) % k;
                     int ip = (i - 1 + k) % k;
                     int ur = id(in, j, l);
@@ -424,7 +403,6 @@ Graph GenerateHERT(int k, int m) {
     return g;
 }
 
-// R: size of one dimension (rows = cols = R), must be power of 2
 Graph GenerateSEM(int R) {
     if (R < 2 || (R & (R - 1)) != 0) return Graph(0);
     int n = 0;
@@ -432,7 +410,6 @@ Graph GenerateSEM(int R) {
     int N = R * R;
     Graph g(N);
 
-    // one‐bit cyclic left shift on n‐bit number modulo R
     auto shuffle = [&](int x) {
         return ((x << 1) & (R - 1)) | (x >> (n - 1));
     };
@@ -441,17 +418,13 @@ Graph GenerateSEM(int R) {
         for (int c = 0; c < R; ++c) {
             int src = r * R + c;
 
-            // row‐shuffle
             int dst = r * R + shuffle(c);
             if (dst != src) g.AddEdge(src, dst, true);
-            // row‐exchange (flip LSB)
             dst = r * R + (c ^ 1);
             if (dst != src) g.AddEdge(src, dst, true);
 
-            // col‐shuffle
             dst = shuffle(r) * R + c;
             if (dst != src) g.AddEdge(src, dst, true);
-            // col‐exchange
             dst = (r ^ 1) * R + c;
             if (dst != src) g.AddEdge(src, dst, true);
         }
@@ -460,34 +433,27 @@ Graph GenerateSEM(int R) {
     return g;
 }
 
-Graph GenerateHyperX(const std::vector<int>& dims) {
+Graph GenerateHyperX(const std::vector<int> &dims) {
     int m = dims.size();
-    // total vertices
     long long N = 1;
-    for (int d : dims) N *= d;
-    Graph g((int)N);
+    for (int d: dims) N *= d;
+    Graph g((int) N);
 
-    // multipliers for mixed‐radix → linear index
     std::vector<long long> mult(m);
     mult[0] = 1;
     for (int i = 1; i < m; ++i) {
-        mult[i] = mult[i-1] * dims[i-1];
+        mult[i] = mult[i - 1] * dims[i - 1];
     }
 
-    // for each dimension d, build complete graphs along that axis
     for (int d = 0; d < m; ++d) {
-        long long stride   = mult[d];
+        long long stride = mult[d];
         long long blockLen = stride * dims[d];
-        // iterate blocks of size blockLen
         for (long long base = 0; base < N; base += blockLen) {
-            // within each block, offset runs over the other dims
             for (long long offset = 0; offset < stride; ++offset) {
-                // collect the indices of the fiber in this block
-                // fiber: base+offset + k*stride, k=0..dims[d]-1
                 for (int i = 0; i < dims[d]; ++i) {
                     for (int j = i + 1; j < dims[d]; ++j) {
-                        int u = (int)(base + offset + i * stride);
-                        int v = (int)(base + offset + j * stride);
+                        int u = (int) (base + offset + i * stride);
+                        int v = (int) (base + offset + j * stride);
                         g.AddEdge(u, v);
                     }
                 }

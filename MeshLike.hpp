@@ -218,16 +218,16 @@ Graph GenerateXNetwork(int rows, int cols) {
 
     for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
-            if (i != rows - 1 && j != cols - 1) { // se
+            if (i != rows - 1 && j != cols - 1) {
                 g.AddEdge(router_idx + i * (cols - 1) + j, i * cols + j);
             }
-            if (i != 0 && j != cols - 1) { // ne
+            if (i != 0 && j != cols - 1) {
                 g.AddEdge(router_idx + i * (cols - 1) + j - cols + 1, i * cols + j);
             }
-            if (i != rows - 1 && j != 0) { // sw
+            if (i != rows - 1 && j != 0) {
                 g.AddEdge(router_idx + i * (cols - 1) + j - 1, i * cols + j);
             }
-            if (i != 0 && j != 0) { // nw
+            if (i != 0 && j != 0) {
                 g.AddEdge(router_idx + i * (cols - 1) + j - cols, i * cols + j);
             }
         }
@@ -450,7 +450,7 @@ Graph GenerateHypercube(int dimensions) {
     return g;
 }
 
-// Fibonacci-cube of rank n (n ≥ 1)
+
 Graph GenerateFibonacciCube(int n) {
     if (n < 1 || n > 30) return Graph(0);
 
@@ -571,7 +571,6 @@ Graph GenerateKAryNCubes(int size_per_dim,
 }
 
 
-// Metacube MC(k,m): k — число бит class-ID, m — число бит node-ID
 Graph GenerateMetacube(int k, int m) {
     if (k < 0 || m <= 0) {
         return Graph(0);
