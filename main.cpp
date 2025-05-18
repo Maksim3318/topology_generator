@@ -18,10 +18,12 @@ using namespace std;
 void printUsage(const char *prog) {
     cerr << "Usage: " << prog << " <mode> <topology> [parameters...]\n"
          << "  mode: params | net\n"
+         << "  [filename] - for net mode\n"
+         << "  [delays router_to_node node_to_router router_to_router] - for net mode"
          << "  topology: one of [list of Generate functions]\n"
          << "Examples:\n"
          << "  " << prog << " params BFT 4 2\n"
-         << "  " << prog << " net Circulant 1024 1 144 258 276\n";
+         << "  " << prog << " net out.file 1 2 3 Circulant 1024 1 144 258 276\n";
 }
 
 // Generator function type and registry
@@ -522,6 +524,14 @@ void InitGenerators() {
         int cols = stoi(args[1]);
         return GenerateZMesh(rows, cols);
     }, 2, 2};
+    generators["FatHTree"] = {[](const vector<string> &args) -> Graph {
+        int n = stoi(args[0]);
+        return GenerateFatHTree(n);
+    }, 1, 1};
+    generators["TreeMesh"] = {[](const vector<string> &args) -> Graph {
+        int n = stoi(args[0]);
+        return GenerateTreeMesh(n);
+    }, 1, 1};
 }
 
 int main(int argc, char *argv[]) {
@@ -542,8 +552,12 @@ int main(int argc, char *argv[]) {
             printUsage(argv[0]);
             return 1;
         }
-        string topo_net = argv[2];
-        string filename = argv[3];
+        string filename = argv[2];
+        Delay delay;
+        delay.router_to_node = atoi(argv[3]);
+        delay.node_to_router = atoi(argv[4]);
+        delay.router_to_router = atoi(argv[5]);
+        string topo_net = argv[6];
         auto it_net = generators.find(topo_net);
         if (it_net == generators.end()) {
             cerr << "Unknown topology: " << topo_net << endl;
@@ -551,14 +565,14 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         vector<string> args_net;
-        for (int i = 4; i < argc; ++i)
+        for (int i = 7; i < argc; ++i)
             args_net.emplace_back(argv[i]);
         Graph g_net = it_net->second.fn(args_net);
         if (g_net.NumVertices() == 0) {
             cerr << "Error: generated empty graph" << endl;
             return 1;
         }
-        CreateAnynetConfig(filename, g_net);
+        CreateAnynetConfig(filename, g_net, delay);
         return 0;
     } else if (mode == "params") {
         string topo = argv[2];
